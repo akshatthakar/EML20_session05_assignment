@@ -9,6 +9,7 @@ root = pyrootutils.setup_root(
 
 from typing import List, Tuple
 
+import json
 import torch
 from PIL import Image
 import hydra
@@ -56,8 +57,25 @@ def demo(cfg: DictConfig) -> Tuple[dict, dict]:
         transform = create_transform(**config)
         tensor = transform(image).unsqueeze(0)
         preds = model.forward_jit(tensor)
+        probabilities = preds[0]
+        top1_prob, top1_catid = torch.topk(probabilities, 1)
+        response = ""
+        responses = []
         preds = preds[0].tolist()
-        return {str(labels_dict[i]): preds[i] for i in range(10)}
+        response = {str(labels_dict[i]): preds[i] for i in range(10)}
+        response_sorted = sorted(response.items(), key=lambda item: item[1],reverse=True)
+        print(response_sorted)
+        label_value = response_sorted[0]
+        print(label_value)
+        final = {"data":{"label" : label_value[0], "confidences": response_sorted}}
+        return json.dumps(final)
+        """import json
+        for i in range(top1_prob.size(0)):
+            response = f'"label" : {labels_dict[top1_catid[i]]}, "confidence" : {top1_prob[i].item()}'
+            response = "{"+response +"}"
+            responses.append(response)
+        result = {"response": {"data": json.dumps(responses)}}
+        return result"""
 
     demo = gr.Interface(
         fn=recognize_image,
